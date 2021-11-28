@@ -3,7 +3,7 @@ package forward
 import (
 	"flag"
 	"fmt"
-	"github.com/ICKelin/gtun/internal/logs"
+	"github.com/ICKelin/optw/internal/logs"
 )
 
 func Main() {

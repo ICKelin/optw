@@ -1,6 +1,6 @@
 package main
 
-import "github.com/ICKelin/gtun/forward"
+import "github.com/ICKelin/optw/forward"
 
 func main() {
 	forward.Main()

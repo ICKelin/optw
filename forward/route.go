@@ -2,9 +2,9 @@ package forward
 
 import (
 	"fmt"
-	"github.com/ICKelin/gtun/internal/logs"
 	"github.com/ICKelin/gtun/transport"
 	"github.com/ICKelin/gtun/transport/transport_api"
+	"github.com/ICKelin/optw/internal/logs"
 	"math"
 	"sync"
 	"time"

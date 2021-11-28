@@ -1,6 +1,7 @@
-package forward
+package target
 
 import (
+	"github.com/ICKelin/gtun/transport"
 	"github.com/ICKelin/optw/internal/logs"
 	"io"
 	"net"
@@ -8,32 +9,26 @@ import (
 )
 
 type Forward struct {
-	addr       string
-	routeTable *RouteTable
+	listener   transport.Listener
+	targetAddr string
 	mempool    sync.Pool
 }
 
-func NewForward(addr string, routeTable *RouteTable) *Forward {
+func NewForward(listener transport.Listener, targetAddr string) *Forward {
 	return &Forward{
-		addr:       addr,
-		routeTable: routeTable,
+		listener:   listener,
+		targetAddr: targetAddr,
 		mempool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 1024*4)
+				return make([]byte, 1024*64)
 			},
 		},
 	}
 }
 
 func (f *Forward) ListenAndServe() error {
-	listener, err := net.Listen("tcp", f.addr)
-	if err != nil {
-		return err
-	}
-	defer listener.Close()
-
 	for {
-		conn, err := listener.Accept()
+		conn, err := f.listener.Accept()
 		if err != nil {
 			logs.Debug("accept fail: %v", err)
 			break
@@ -46,27 +41,36 @@ func (f *Forward) ListenAndServe() error {
 	return nil
 }
 
-func (f *Forward) forward(conn net.Conn) {
-	entry, err := f.routeTable.Route()
+func (f *Forward) forward(conn transport.Conn) {
+	defer conn.Close()
+
+	// dial target address
+	targetConn, err := net.Dial("tcp", f.targetAddr)
 	if err != nil {
-		logs.Error("route fail: %v", err)
+		logs.Error("dial target fail: %v", err)
 		return
 	}
-	logs.Debug("prev hop %v next hop:%v", conn.RemoteAddr(), entry.conn.RemoteAddr())
+	logs.Debug("open a new connection to target %v", f.targetAddr)
+	defer targetConn.Close()
 
-	stream, err := entry.conn.OpenStream()
-	if err != nil {
-		logs.Error("open next hop stream fail: %v", err)
-		return
+	for {
+		stream, err := conn.AcceptStream()
+		if err != nil {
+			logs.Error("accept stream for %v fail; %v", conn.RemoteAddr(), err)
+			break
+		}
+
+		go f.handleStream(stream, targetConn)
 	}
+}
 
+func (f *Forward) handleStream(stream transport.Stream, conn net.Conn) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
 	go func() {
-		defer conn.Close()
-		defer stream.Close()
 		defer wg.Done()
+		defer stream.Close()
 		obj := f.mempool.Get()
 		defer f.mempool.Put(obj)
 		buf := obj.([]byte)
@@ -74,9 +78,8 @@ func (f *Forward) forward(conn net.Conn) {
 	}()
 
 	go func() {
-		defer conn.Close()
-		defer stream.Close()
 		defer wg.Done()
+		defer stream.Close()
 		obj := f.mempool.Get()
 		defer f.mempool.Put(obj)
 		buf := obj.([]byte)
