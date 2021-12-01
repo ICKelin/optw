@@ -58,41 +58,49 @@ func (r *RouteTable) healthy() {
 		r.tableMu.Unlock()
 
 		if len(deadConn) > 0 {
-			for entryKey, entry := range deadConn {
-				e, err := r.newEntry(entry.scheme, entry.addr, entry.cfg)
-				if err != nil {
-					logs.Debug("new entry fail: %v", err)
-					continue
+			go func(conns map[string]*RouteEntry) {
+				for entryKey, entry := range conns {
+					e, err := r.newEntry(entry.scheme, entry.addr, entry.cfg)
+					if err != nil {
+						logs.Debug("new entry fail: %v", err)
+						continue
+					}
+
+					logs.Info("reconnect next hop %s", entryKey)
+
+					r.tableMu.Lock()
+					r.table[entryKey] = e
+					r.tableMu.Unlock()
 				}
-
-				logs.Info("reconnect next hop %s", entryKey)
-
-				r.tableMu.Lock()
-				r.table[entryKey] = e
-				r.tableMu.Unlock()
-			}
+			}(deadConn)
 		}
 	}
 }
 
 func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
-	dialer, err := transport_api.NewDialer(scheme, addr, cfg)
-	if err != nil {
-		return nil, err
-	}
+	for {
+		dialer, err := transport_api.NewDialer(scheme, addr, cfg)
+		if err != nil {
+			logs.Error("new dialer fail: %v", err)
+			time.Sleep(time.Second * 1)
+			continue
+		}
 
-	conn, err := dialer.Dial()
-	if err != nil {
-		return nil, err
-	}
+		conn, err := dialer.Dial()
+		if err != nil {
+			logs.Error("dial fail: %v", err)
+			time.Sleep(time.Second * 1)
+			continue
+		}
 
-	entry := &RouteEntry{
-		scheme: scheme,
-		addr:   addr,
-		cfg:    cfg,
-		conn:   conn,
+		entry := &RouteEntry{
+			scheme: scheme,
+			addr:   addr,
+			cfg:    cfg,
+			conn:   conn,
+		}
+		return entry, nil
 	}
-	return entry, nil
 }
 
 func (r *RouteTable) Add(scheme, addr, cfg string) error {
