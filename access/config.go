@@ -1,4 +1,4 @@
-package forward
+package access
 
 import (
 	"encoding/json"
@@ -7,12 +7,12 @@ import (
 )
 
 type Config struct {
-	RouteConfig []RouteConfig `yaml:"route_config"`
+	RouteConfig RouteConfig `yaml:"route_config"`
 }
 
 type RouteConfig struct {
 	ListenerConfig ListenerConfig `yaml:"listener"`
-	NexthopConfig  NextHopConfig  `yaml:"dialer"`
+	NexthopConfig  []NextHopConfig  `yaml:"dialer"`
 }
 
 type ListenerConfig struct {

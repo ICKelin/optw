@@ -1,4 +1,4 @@
-package forward
+package access
 
 import (
 	"github.com/ICKelin/optw/internal/logs"
@@ -25,7 +25,7 @@ func NewForward(addr string, routeTable *RouteTable) *Forward {
 	}
 }
 
-func (f *Forward) ListenAndServe() error {
+func (f *Forward) ServeTCP() error {
 	listener, err := net.Listen("tcp", f.addr)
 	if err != nil {
 		return err
