@@ -34,11 +34,13 @@ func Main() {
 		}
 	}
 
-	f := NewForward(lisCfg.ListenAddr, routeTable)
-
-	if err := f.ServeTCP(); err != nil {
-		logs.Error("access exist: %v", err)
+	f := NewForward(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
+	switch f.scheme {
+	case "tcp":
+		err = f.ServeTCP()
+	default:
+		err = f.ServeMux()
 	}
 
-	select {}
+	logs.Error("access exist: %v", err)
 }

@@ -1,6 +1,8 @@
 package access
 
 import (
+	"github.com/ICKelin/gtun/transport"
+	"github.com/ICKelin/gtun/transport/transport_api"
 	"github.com/ICKelin/optw/internal/logs"
 	"io"
 	"net"
@@ -8,13 +10,15 @@ import (
 )
 
 type Forward struct {
+	scheme     string
 	addr       string
 	routeTable *RouteTable
 	mempool    sync.Pool
 }
 
-func NewForward(addr string, routeTable *RouteTable) *Forward {
+func NewForward(scheme, addr string, routeTable *RouteTable) *Forward {
 	return &Forward{
+		scheme:     scheme,
 		addr:       addr,
 		routeTable: routeTable,
 		mempool: sync.Pool{
@@ -46,13 +50,46 @@ func (f *Forward) ServeTCP() error {
 	return nil
 }
 
-func (f *Forward) forward(conn net.Conn) {
+func (f *Forward) ServeMux() error {
+	listener, err := transport_api.NewListen(f.scheme, f.addr, "")
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			logs.Error("accept fail: %v", err)
+			break
+		}
+
+		go f.handleMuxConn(conn)
+	}
+	return nil
+}
+
+func (f *Forward) handleMuxConn(conn transport.Conn) {
+	defer conn.Close()
+
+	for {
+		stream, err := conn.AcceptStream()
+		if err != nil {
+			logs.Error("accept stream fail: %v", err)
+			break
+		}
+
+		go f.forward(stream)
+	}
+}
+
+func (f *Forward) forward(conn io.ReadWriteCloser) {
 	entry, err := f.routeTable.Route()
 	if err != nil {
 		logs.Error("route fail: %v", err)
 		return
 	}
-	logs.Debug("prev hop %v next hop:%v", conn.RemoteAddr(), entry.conn.RemoteAddr())
+	logs.Debug("next hop:%v", entry.conn.RemoteAddr())
 
 	stream, err := entry.conn.OpenStream()
 	if err != nil {
@@ -85,5 +122,5 @@ func (f *Forward) forward(conn net.Conn) {
 	}()
 
 	wg.Wait()
-	logs.Debug("connection %v closed", conn.RemoteAddr())
+	logs.Debug("connection %v closed")
 }
