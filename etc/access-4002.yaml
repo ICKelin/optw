@@ -1,11 +1,11 @@
 route_config:
   listener:
     scheme: "tcp"
-    listen_addr: ":3001"
+    listen_addr: ":4002"
   dialer:
-    - nexthop_addr: "127.0.0.1:4001"
+    - nexthop_addr: "127.0.0.1:5001"
       scheme: "mux"
       raw_config: ""
-    - nexthop_addr: "127.0.0.1:4002"
+    - nexthop_addr: "127.0.0.1:5002"
       scheme: "mux"
       raw_config: ""

@@ -1,4 +1,4 @@
-package access
+package hop
 
 import (
 	"flag"
@@ -16,8 +16,8 @@ func Main() {
 		return
 	}
 
-	logs.Init("access.log", "debug", 10)
-	logs.Debug("access config: %v", cfg)
+	logs.Init("hop.log", "debug", 10)
+	logs.Debug("hop config: %v", cfg)
 
 	routeCfg := cfg.RouteConfig
 	// initial local listener
@@ -42,5 +42,5 @@ func Main() {
 		err = f.ServeMux()
 	}
 
-	logs.Error("access exist: %v", err)
+	logs.Error("hop exist: %v", err)
 }

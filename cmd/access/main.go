@@ -1,7 +1,7 @@
 package main
 
-import "github.com/ICKelin/optw/access"
+import "github.com/ICKelin/optw/hop"
 
 func main() {
-	access.Main()
+	hop.Main()
 }

@@ -1,4 +1,4 @@
-package access
+package hop
 
 import (
 	"github.com/ICKelin/gtun/transport"
@@ -79,7 +79,10 @@ func (f *Forward) handleMuxConn(conn transport.Conn) {
 			break
 		}
 
-		go f.forward(stream)
+		go func(stream transport.Stream) {
+			logs.Warn("stream %s closed", stream.RemoteAddr())
+			f.forward(stream)
+		}(stream)
 	}
 }
 
@@ -122,5 +125,4 @@ func (f *Forward) forward(conn io.ReadWriteCloser) {
 	}()
 
 	wg.Wait()
-	logs.Debug("connection %v closed")
 }
