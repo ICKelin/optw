@@ -34,7 +34,7 @@ func Main() {
 		}
 	}
 
-	f := NewForward(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
+	f := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
 	switch f.scheme {
 	case "tcp":
 		err = f.ServeTCP()

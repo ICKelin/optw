@@ -44,6 +44,7 @@ func (r *RouteTable) healthy() {
 	for range tick.C {
 		deadConn := make(map[string]*RouteEntry)
 		aliveConn := make(map[string]*RouteEntry)
+		aliveConnForRtt := make(map[string]*RouteEntry, 0)
 
 		r.tableMu.Lock()
 		for entryKey, entry := range r.table {
@@ -52,6 +53,7 @@ func (r *RouteTable) healthy() {
 				deadConn[entryKey] = entry
 			} else {
 				aliveConn[entryKey] = entry
+				aliveConnForRtt[entryKey] = entry
 			}
 		}
 		r.table = aliveConn
@@ -73,6 +75,28 @@ func (r *RouteTable) healthy() {
 					r.tableMu.Unlock()
 				}
 			}(deadConn)
+		}
+
+		if len(aliveConnForRtt) > 0 {
+			minRtt := int64(-1)
+			minRttKey := ""
+			for entryKey, entry := range aliveConnForRtt {
+				beg := time.Now()
+				s, err := entry.conn.OpenStream()
+				if err != nil {
+					logs.Error("open stream to %s for rtt measurement fail: %v", entry.addr, err)
+					continue
+				}
+
+				diff := time.Now().Sub(beg).Microseconds()
+				logs.Info("next hop %s rtt cost %d micro seconds", entry.conn.RemoteAddr(), diff)
+				if minRtt < diff {
+					minRtt = diff
+					minRttKey = entryKey
+				}
+				s.Close()
+			}
+			r.minRttKey = minRttKey
 		}
 	}
 }
@@ -138,10 +162,13 @@ func (r *RouteTable) Route() (*RouteEntry, error) {
 
 	entry, ok := r.table[r.minRttKey]
 	if !ok {
+		logs.Info("minRtt value not exist, use random item")
 		for _, e := range r.table {
 			entry = e
 			break
 		}
+	} else {
+		logs.Debug("hit minRtt %s, hop %s", r.minRttKey, entry.addr)
 	}
 
 	return entry, nil

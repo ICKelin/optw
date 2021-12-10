@@ -9,15 +9,15 @@ import (
 	"sync"
 )
 
-type Forward struct {
+type Hop struct {
 	scheme     string
 	addr       string
 	routeTable *RouteTable
 	mempool    sync.Pool
 }
 
-func NewForward(scheme, addr string, routeTable *RouteTable) *Forward {
-	return &Forward{
+func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
+	return &Hop{
 		scheme:     scheme,
 		addr:       addr,
 		routeTable: routeTable,
@@ -29,7 +29,7 @@ func NewForward(scheme, addr string, routeTable *RouteTable) *Forward {
 	}
 }
 
-func (f *Forward) ServeTCP() error {
+func (f *Hop) ServeTCP() error {
 	listener, err := net.Listen("tcp", f.addr)
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (f *Forward) ServeTCP() error {
 	return nil
 }
 
-func (f *Forward) ServeMux() error {
+func (f *Hop) ServeMux() error {
 	listener, err := transport_api.NewListen(f.scheme, f.addr, "")
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (f *Forward) ServeMux() error {
 	return nil
 }
 
-func (f *Forward) handleMuxConn(conn transport.Conn) {
+func (f *Hop) handleMuxConn(conn transport.Conn) {
 	defer conn.Close()
 
 	for {
@@ -86,7 +86,7 @@ func (f *Forward) handleMuxConn(conn transport.Conn) {
 	}
 }
 
-func (f *Forward) forward(conn io.ReadWriteCloser) {
+func (f *Hop) forward(conn io.ReadWriteCloser) {
 	entry, err := f.routeTable.Route()
 	if err != nil {
 		logs.Error("route fail: %v", err)
