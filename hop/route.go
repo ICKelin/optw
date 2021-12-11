@@ -2,9 +2,9 @@ package hop
 
 import (
 	"fmt"
-	"github.com/ICKelin/gtun/transport"
-	"github.com/ICKelin/gtun/transport/transport_api"
 	"github.com/ICKelin/optw/internal/logs"
+	"github.com/ICKelin/optw/transport"
+	"github.com/ICKelin/optw/transport/transport_api"
 	"math"
 	"sync"
 	"time"

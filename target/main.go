@@ -2,8 +2,8 @@ package target
 
 import (
 	"flag"
-	"github.com/ICKelin/gtun/transport/transport_api"
 	"github.com/ICKelin/optw/internal/logs"
+	"github.com/ICKelin/optw/transport/transport_api"
 )
 
 func Main() {

@@ -1,9 +1,9 @@
 package hop
 
 import (
-	"github.com/ICKelin/gtun/transport"
-	"github.com/ICKelin/gtun/transport/transport_api"
 	"github.com/ICKelin/optw/internal/logs"
+	"github.com/ICKelin/optw/transport"
+	"github.com/ICKelin/optw/transport/transport_api"
 	"io"
 	"net"
 	"sync"

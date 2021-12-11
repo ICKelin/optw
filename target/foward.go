@@ -1,8 +1,8 @@
 package target
 
 import (
-	"github.com/ICKelin/gtun/transport"
 	"github.com/ICKelin/optw/internal/logs"
+	"github.com/ICKelin/optw/transport"
 	"io"
 	"net"
 	"sync"
