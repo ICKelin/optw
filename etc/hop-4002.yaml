@@ -2,10 +2,10 @@ route_config:
   listener:
     scheme: "kcp"
     listen_addr: ":4002"
-  dialer:
-    - nexthop_addr: "127.0.0.1:5001"
+  hops:
+    - hop_addr: "127.0.0.1:5001"
       scheme: "mux"
       raw_config: ""
-    - nexthop_addr: "127.0.0.1:5002"
+    - hop_addr: "127.0.0.1:5002"
       scheme: "kcp"
       raw_config: ""

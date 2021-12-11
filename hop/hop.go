@@ -29,8 +29,17 @@ func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
 	}
 }
 
-func (f *Hop) ServeTCP() error {
-	listener, err := net.Listen("tcp", f.addr)
+func (h *Hop) Serve() error {
+	switch h.scheme {
+	case "tcp":
+		return h.ServeTCP()
+	default:
+		return h.ServeMux()
+	}
+}
+
+func (h *Hop) ServeTCP() error {
+	listener, err := net.Listen("tcp", h.addr)
 	if err != nil {
 		return err
 	}
@@ -44,14 +53,14 @@ func (f *Hop) ServeTCP() error {
 		}
 
 		logs.Debug("accept new connection: %v", conn.RemoteAddr())
-		go f.forward(conn)
+		go h.forward(conn)
 	}
 
 	return nil
 }
 
-func (f *Hop) ServeMux() error {
-	listener, err := transport_api.NewListen(f.scheme, f.addr, "")
+func (h *Hop) ServeMux() error {
+	listener, err := transport_api.NewListen(h.scheme, h.addr, "")
 	if err != nil {
 		return err
 	}
@@ -64,12 +73,12 @@ func (f *Hop) ServeMux() error {
 			break
 		}
 
-		go f.handleMuxConn(conn)
+		go h.handleMuxConn(conn)
 	}
 	return nil
 }
 
-func (f *Hop) handleMuxConn(conn transport.Conn) {
+func (h *Hop) handleMuxConn(conn transport.Conn) {
 	defer conn.Close()
 
 	for {
@@ -81,13 +90,13 @@ func (f *Hop) handleMuxConn(conn transport.Conn) {
 
 		go func(stream transport.Stream) {
 			logs.Warn("stream %s closed", stream.RemoteAddr())
-			f.forward(stream)
+			h.forward(stream)
 		}(stream)
 	}
 }
 
-func (f *Hop) forward(conn io.ReadWriteCloser) {
-	entry, err := f.routeTable.Route()
+func (h *Hop) forward(conn io.ReadWriteCloser) {
+	entry, err := h.routeTable.Route()
 	if err != nil {
 		logs.Error("route fail: %v", err)
 		return
@@ -107,8 +116,8 @@ func (f *Hop) forward(conn io.ReadWriteCloser) {
 		defer conn.Close()
 		defer stream.Close()
 		defer wg.Done()
-		obj := f.mempool.Get()
-		defer f.mempool.Put(obj)
+		obj := h.mempool.Get()
+		defer h.mempool.Put(obj)
 		buf := obj.([]byte)
 		io.CopyBuffer(conn, stream, buf)
 	}()
@@ -117,8 +126,8 @@ func (f *Hop) forward(conn io.ReadWriteCloser) {
 		defer conn.Close()
 		defer stream.Close()
 		defer wg.Done()
-		obj := f.mempool.Get()
-		defer f.mempool.Put(obj)
+		obj := h.mempool.Get()
+		defer h.mempool.Put(obj)
 		buf := obj.([]byte)
 		_, err := io.CopyBuffer(stream, conn, buf)
 		logs.Debug("close copy conn->stream: %v", err)

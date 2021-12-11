@@ -17,7 +17,7 @@ var (
 
 type RouteEntry struct {
 	scheme, addr, cfg string
-	rtt               int32
+	rtt               int64
 	conn              transport.Conn
 }
 
@@ -89,9 +89,11 @@ func (r *RouteTable) healthy() {
 				}
 
 				diff := time.Now().Sub(beg).Microseconds()
+				srtt := entry.rtt + diff/2
+				entry.rtt = srtt
 				logs.Info("next hop %s rtt cost %d micro seconds", entry.conn.RemoteAddr(), diff)
-				if minRtt < diff {
-					minRtt = diff
+				if minRtt < srtt {
+					minRtt = srtt
 					minRttKey = entryKey
 				}
 				s.Close()

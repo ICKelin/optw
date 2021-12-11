@@ -23,24 +23,19 @@ func Main() {
 	// initial local listener
 	lisCfg := routeCfg.ListenerConfig
 
+	// initial route table
+	// TODO: get route table from registry
 	routeTable := NewRouteTable()
-
-	// initial next hop dialer
-	for _, nexthop := range routeCfg.NexthopConfig {
-		err = routeTable.Add(nexthop.Scheme, nexthop.NexthopAddr, nexthop.RawConfig)
+	for _, hopCfg := range routeCfg.HopConfig {
+		err = routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.RawConfig)
 		if err != nil {
 			logs.Error("add route table fail: %v", err)
 			continue
 		}
 	}
 
-	f := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
-	switch f.scheme {
-	case "tcp":
-		err = f.ServeTCP()
-	default:
-		err = f.ServeMux()
-	}
-
+	// initial hop
+	h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
+	err = h.Serve()
 	logs.Error("hop exist: %v", err)
 }

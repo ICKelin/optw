@@ -11,8 +11,8 @@ type Config struct {
 }
 
 type RouteConfig struct {
-	ListenerConfig ListenerConfig  `yaml:"listener"`
-	NexthopConfig  []NextHopConfig `yaml:"dialer"`
+	ListenerConfig ListenerConfig `yaml:"listener"`
+	HopConfig      []HopConfig    `yaml:"hops"`
 }
 
 type ListenerConfig struct {
@@ -20,9 +20,9 @@ type ListenerConfig struct {
 	ListenAddr string `yaml:"listen_addr"`
 }
 
-type NextHopConfig struct {
-	NexthopAddr string `yaml:"nexthop_addr"`
-	Scheme      string `yaml:"scheme"`
+type HopConfig struct {
+	HopAddr string `yaml:"hop_addr"`
+	Scheme  string `yaml:"scheme"`
 	RawConfig   string `yaml:"raw_config"`
 }
 
