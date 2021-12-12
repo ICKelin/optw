@@ -27,11 +27,7 @@ func Main() {
 	// TODO: get route table from registry
 	routeTable := NewRouteTable()
 	for _, hopCfg := range routeCfg.HopConfig {
-		err = routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.RawConfig)
-		if err != nil {
-			logs.Error("add route table fail: %v", err)
-			continue
-		}
+		go routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.ProbeAddr, hopCfg.RawConfig)
 	}
 
 	// initial hop

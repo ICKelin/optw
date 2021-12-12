@@ -96,16 +96,9 @@ func (h *Hop) handleMuxConn(conn transport.Conn) {
 }
 
 func (h *Hop) forward(conn io.ReadWriteCloser) {
-	entry, err := h.routeTable.Route()
+	stream, err := h.routeTable.Route()
 	if err != nil {
 		logs.Error("route fail: %v", err)
-		return
-	}
-	logs.Debug("next hop:%v", entry.conn.RemoteAddr())
-
-	stream, err := entry.conn.OpenStream()
-	if err != nil {
-		logs.Error("open next hop stream fail: %v", err)
 		return
 	}
 

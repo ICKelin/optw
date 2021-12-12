@@ -6,7 +6,9 @@ import (
 	"github.com/ICKelin/optw/transport"
 	"github.com/ICKelin/optw/transport/transport_api"
 	"math"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,14 +20,16 @@ var (
 type RouteEntry struct {
 	scheme, addr, cfg string
 	rtt               int64
+	loss              int64
+	hitCount          int64
 	conn              transport.Conn
+	probeAddr         string
 }
 
 type RouteTable struct {
 	// key: scheme://addr
-	tableMu   sync.RWMutex
-	table     map[string]*RouteEntry
-	minRttKey string
+	tableMu sync.RWMutex
+	table   map[string]*RouteEntry
 }
 
 func NewRouteTable() *RouteTable {
@@ -33,11 +37,11 @@ func NewRouteTable() *RouteTable {
 		table: make(map[string]*RouteEntry),
 	}
 
-	go rt.healthy()
+	go rt.healthCheck()
 	return rt
 }
 
-func (r *RouteTable) healthy() {
+func (r *RouteTable) healthCheck() {
 	tick := time.NewTicker(time.Second * 5)
 	defer tick.Stop()
 
@@ -62,7 +66,7 @@ func (r *RouteTable) healthy() {
 		if len(deadConn) > 0 {
 			go func(conns map[string]*RouteEntry) {
 				for entryKey, entry := range conns {
-					e, err := r.newEntry(entry.scheme, entry.addr, entry.cfg)
+					e, err := r.newEntry(entry.scheme, entry.addr, entry.probeAddr, entry.cfg)
 					if err != nil {
 						logs.Debug("new entry fail: %v", err)
 						continue
@@ -76,34 +80,67 @@ func (r *RouteTable) healthy() {
 				}
 			}(deadConn)
 		}
-
-		if len(aliveConnForRtt) > 0 {
-			minRtt := int64(-1)
-			minRttKey := ""
-			for entryKey, entry := range aliveConnForRtt {
-				beg := time.Now()
-				s, err := entry.conn.OpenStream()
-				if err != nil {
-					logs.Error("open stream to %s for rtt measurement fail: %v", entry.addr, err)
-					continue
-				}
-
-				diff := time.Now().Sub(beg).Microseconds()
-				srtt := entry.rtt + diff/2
-				entry.rtt = srtt
-				logs.Info("next hop %s rtt cost %d micro seconds", entry.conn.RemoteAddr(), diff)
-				if minRtt < srtt {
-					minRtt = srtt
-					minRttKey = entryKey
-				}
-				s.Close()
-			}
-			r.minRttKey = minRttKey
-		}
 	}
 }
 
-func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
+func (r *RouteTable) probeEntry(entry *RouteEntry) {
+	// no need to probe remote
+	if len(entry.probeAddr) <= 0 {
+		logs.Warn("ignore probe for next hop %s", entry.addr)
+		return
+	}
+
+	laddr, err := net.ResolveUDPAddr("udp", "")
+	if err != nil {
+		logs.Error("resolve local udp fail: %v", err)
+		return
+	}
+
+	conn, err := net.ListenUDP("udp", laddr)
+	if err != nil {
+		logs.Error("listen probe udp fail: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	raddr, err := net.ResolveUDPAddr("udp", entry.probeAddr)
+	if err != nil {
+		logs.Error("resolve probe udp %s fail: %v", entry.probeAddr, err)
+		return
+	}
+
+	tick := time.NewTicker(time.Second * 5)
+	defer tick.Stop()
+
+	sndbuf := []byte{0x01}
+	rcvbuf := make([]byte, 1)
+	lastRtt := int64(0)
+	for range tick.C {
+		beg := time.Now()
+		_, err := conn.WriteToUDP(sndbuf, raddr)
+		if err != nil {
+			logs.Error("write to probe %s fail: %v", entry.probeAddr, err)
+			continue
+		}
+
+		conn.SetReadDeadline(time.Now().Add(time.Second * 2))
+		_, err = conn.Read(rcvbuf)
+		conn.SetReadDeadline(time.Time{})
+		if err != nil {
+			logs.Error("read from probe %s fail: %v", entry.probeAddr, err)
+			atomic.AddInt64(&entry.loss, 1)
+			continue
+		}
+
+		diff := time.Now().Sub(beg).Microseconds()
+		srtt := (lastRtt + diff) / 2
+		lastRtt = srtt
+		atomic.StoreInt64(&entry.rtt, srtt)
+		atomic.StoreInt64(&entry.loss, 0)
+	}
+}
+
+func (r *RouteTable) newEntry(scheme, addr, probeAddr, cfg string) (*RouteEntry, error) {
 	for {
 		dialer, err := transport_api.NewDialer(scheme, addr, cfg)
 		if err != nil {
@@ -120,17 +157,20 @@ func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
 		}
 
 		entry := &RouteEntry{
-			scheme: scheme,
-			addr:   addr,
-			cfg:    cfg,
-			conn:   conn,
+			scheme:    scheme,
+			addr:      addr,
+			cfg:       cfg,
+			conn:      conn,
+			probeAddr: probeAddr,
 		}
+
+		go r.probeEntry(entry)
 		return entry, nil
 	}
 }
 
-func (r *RouteTable) Add(scheme, addr, cfg string) error {
-	entry, err := r.newEntry(scheme, addr, cfg)
+func (r *RouteTable) Add(scheme, addr, probeAddr, cfg string) error {
+	entry, err := r.newEntry(scheme, addr, probeAddr, cfg)
 	if err != nil {
 		return err
 	}
@@ -150,28 +190,28 @@ func (r *RouteTable) Del(scheme, addr string) {
 		if entry.scheme == scheme &&
 			entry.addr == addr {
 			delete(r.table, key)
+			entry.conn.Close()
 			break
 		}
 	}
 }
 
-func (r *RouteTable) Route() (*RouteEntry, error) {
+func (r *RouteTable) Route() (transport.Stream, error) {
 	r.tableMu.RLock()
 	defer r.tableMu.RUnlock()
 	if len(r.table) <= 0 {
 		return nil, errNoRoute
 	}
-
-	entry, ok := r.table[r.minRttKey]
-	if !ok {
-		logs.Info("minRtt value not exist, use random item")
-		for _, e := range r.table {
-			entry = e
-			break
+	for _, e := range r.table {
+		stream, err := e.conn.OpenStream()
+		if err != nil {
+			logs.Error("entry %s open stream fail: %v", e.conn.RemoteAddr(), err)
+			continue
 		}
-	} else {
-		logs.Debug("hit minRtt %s, hop %s", r.minRttKey, entry.addr)
+
+		atomic.AddInt64(&e.hitCount, 1)
+		return stream, nil
 	}
 
-	return entry, nil
+	return nil, errNoRoute
 }

@@ -5,7 +5,9 @@ route_config:
   hops:
     - hop_addr: "127.0.0.1:5001"
       scheme: "mux"
+      probe_addr: ""
       raw_config: ""
     - hop_addr: "127.0.0.1:5002"
       scheme: "kcp"
+      probe_addr: ""
       raw_config: ""

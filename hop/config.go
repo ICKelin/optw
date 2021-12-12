@@ -21,9 +21,10 @@ type ListenerConfig struct {
 }
 
 type HopConfig struct {
-	HopAddr string `yaml:"hop_addr"`
-	Scheme  string `yaml:"scheme"`
-	RawConfig   string `yaml:"raw_config"`
+	HopAddr   string `yaml:"hop_addr"`
+	Scheme    string `yaml:"scheme"`
+	ProbeAddr string `yaml:"probe_addr"`
+	RawConfig string `yaml:"raw_config"`
 }
 
 func ParseConfig(path string) (*Config, error) {
