@@ -20,18 +20,19 @@ func Main() {
 	logs.Debug("hop config: %v", cfg)
 
 	routeCfg := cfg.RouteConfig
-	// initial local listener
-	lisCfg := routeCfg.ListenerConfig
 
 	// initial route table
-	// TODO: get route table from registry
 	routeTable := NewRouteTable()
-	for _, hopCfg := range routeCfg.HopConfig {
-		go routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.ProbeAddr, hopCfg.RawConfig)
+	for _, c := range routeCfg {
+		for _, hopCfg := range c.HopConfig {
+			go routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.ProbeAddr, hopCfg.RawConfig)
+		}
+
+		// initial hop
+		lisCfg := c.ListenerConfig
+		h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
+		go h.Serve()
 	}
 
-	// initial hop
-	h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
-	err = h.Serve()
-	logs.Error("hop exist: %v", err)
+	select {}
 }

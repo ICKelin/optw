@@ -1,13 +1,13 @@
 route_config:
   listener:
     scheme: "tcp"
-    listen_addr: ":3001"
+    listen_addr: ":2000"
   hops:
-    - hop_addr: "127.0.0.1:4001"
+    - hop_addr: "us_ec2:2001"
       scheme: "mux"
       probe_addr: ""
       raw_config: ""
-    - hop_addr: "127.0.0.1:4002"
+    - hop_addr: "us_ec2:3001"
       scheme: "kcp"
       probe_addr: ""
       raw_config: ""

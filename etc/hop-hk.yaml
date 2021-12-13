@@ -1,0 +1,25 @@
+route_config:
+    - listener:
+        scheme: "tcp"
+        listen_addr: ":2000"
+      hops:
+        - hop_addr: "us_ec2:2001"
+          scheme: "mux"
+          probe_addr: ""
+          raw_config: ""
+        - hop_addr: "us_ec2:3001"
+          scheme: "kcp"
+          probe_addr: ""
+          raw_config: ""
+    - listener:
+        scheme: "tcp"
+        listen_addr: ":3000"
+      hops:
+        - hop_addr: "us_ec2:2001"
+          scheme: "mux"
+          probe_addr: ""
+          raw_config: ""
+        - hop_addr: "us_ec2:3001"
+          scheme: "kcp"
+          probe_addr: ""
+          raw_config: ""

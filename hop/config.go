@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	RouteConfig RouteConfig `yaml:"route_config"`
+	RouteConfig []RouteConfig `yaml:"route_config"`
 }
 
 type RouteConfig struct {

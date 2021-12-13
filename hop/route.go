@@ -6,7 +6,6 @@ import (
 	"github.com/ICKelin/optw/transport"
 	"github.com/ICKelin/optw/transport/transport_api"
 	"math"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,6 +57,7 @@ func (r *RouteTable) healthCheck() {
 			} else {
 				aliveConn[entryKey] = entry
 				aliveConnForRtt[entryKey] = entry
+				logs.Info("hop %s hit count %d", entryKey, atomic.LoadInt64(&entry.hitCount))
 			}
 		}
 		r.table = aliveConn
@@ -83,62 +83,63 @@ func (r *RouteTable) healthCheck() {
 	}
 }
 
-func (r *RouteTable) probeEntry(entry *RouteEntry) {
-	// no need to probe remote
-	if len(entry.probeAddr) <= 0 {
-		logs.Warn("ignore probe for next hop %s", entry.addr)
-		return
-	}
-
-	laddr, err := net.ResolveUDPAddr("udp", "")
-	if err != nil {
-		logs.Error("resolve local udp fail: %v", err)
-		return
-	}
-
-	conn, err := net.ListenUDP("udp", laddr)
-	if err != nil {
-		logs.Error("listen probe udp fail: %v", err)
-		return
-	}
-	defer conn.Close()
-
-	raddr, err := net.ResolveUDPAddr("udp", entry.probeAddr)
-	if err != nil {
-		logs.Error("resolve probe udp %s fail: %v", entry.probeAddr, err)
-		return
-	}
-
-	tick := time.NewTicker(time.Second * 5)
-	defer tick.Stop()
-
-	sndbuf := []byte{0x01}
-	rcvbuf := make([]byte, 1)
-	lastRtt := int64(0)
-	for range tick.C {
-		beg := time.Now()
-		_, err := conn.WriteToUDP(sndbuf, raddr)
-		if err != nil {
-			logs.Error("write to probe %s fail: %v", entry.probeAddr, err)
-			continue
-		}
-
-		conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-		_, err = conn.Read(rcvbuf)
-		conn.SetReadDeadline(time.Time{})
-		if err != nil {
-			logs.Error("read from probe %s fail: %v", entry.probeAddr, err)
-			atomic.AddInt64(&entry.loss, 1)
-			continue
-		}
-
-		diff := time.Now().Sub(beg).Microseconds()
-		srtt := (lastRtt + diff) / 2
-		lastRtt = srtt
-		atomic.StoreInt64(&entry.rtt, srtt)
-		atomic.StoreInt64(&entry.loss, 0)
-	}
-}
+//
+//func (r *RouteTable) probeEntry(entry *RouteEntry) {
+//	// no need to probe remote
+//	if len(entry.probeAddr) <= 0 {
+//		logs.Warn("ignore probe for next hop %s", entry.addr)
+//		return
+//	}
+//
+//	laddr, err := net.ResolveUDPAddr("udp", "")
+//	if err != nil {
+//		logs.Error("resolve local udp fail: %v", err)
+//		return
+//	}
+//
+//	conn, err := net.ListenUDP("udp", laddr)
+//	if err != nil {
+//		logs.Error("listen probe udp fail: %v", err)
+//		return
+//	}
+//	defer conn.Close()
+//
+//	raddr, err := net.ResolveUDPAddr("udp", entry.probeAddr)
+//	if err != nil {
+//		logs.Error("resolve probe udp %s fail: %v", entry.probeAddr, err)
+//		return
+//	}
+//
+//	tick := time.NewTicker(time.Second * 5)
+//	defer tick.Stop()
+//
+//	sndbuf := []byte{0x01}
+//	rcvbuf := make([]byte, 1)
+//	lastRtt := int64(0)
+//	for range tick.C {
+//		beg := time.Now()
+//		_, err := conn.WriteToUDP(sndbuf, raddr)
+//		if err != nil {
+//			logs.Error("write to probe %s fail: %v", entry.probeAddr, err)
+//			continue
+//		}
+//
+//		conn.SetReadDeadline(time.Now().Add(time.Second * 2))
+//		_, err = conn.Read(rcvbuf)
+//		conn.SetReadDeadline(time.Time{})
+//		if err != nil {
+//			logs.Error("read from probe %s fail: %v", entry.probeAddr, err)
+//			atomic.AddInt64(&entry.loss, 1)
+//			continue
+//		}
+//
+//		diff := time.Now().Sub(beg).Microseconds()
+//		srtt := (lastRtt + diff) / 2
+//		lastRtt = srtt
+//		atomic.StoreInt64(&entry.rtt, srtt)
+//		atomic.StoreInt64(&entry.loss, 0)
+//	}
+//}
 
 func (r *RouteTable) newEntry(scheme, addr, probeAddr, cfg string) (*RouteEntry, error) {
 	for {
@@ -164,7 +165,7 @@ func (r *RouteTable) newEntry(scheme, addr, probeAddr, cfg string) (*RouteEntry,
 			probeAddr: probeAddr,
 		}
 
-		go r.probeEntry(entry)
+		//go r.probeEntry(entry)
 		return entry, nil
 	}
 }
