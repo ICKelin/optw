@@ -60,6 +60,8 @@ func (h *Hop) ServeTCP() error {
 }
 
 func (h *Hop) ServeMux() error {
+	go h.ServeProbe()
+
 	listener, err := transport_api.NewListen(h.scheme, h.addr, "")
 	if err != nil {
 		return err
@@ -77,6 +79,8 @@ func (h *Hop) ServeMux() error {
 	}
 	return nil
 }
+
+func (h *Hop) ServeProbe() {}
 
 func (h *Hop) handleMuxConn(conn transport.Conn) {
 	defer conn.Close()

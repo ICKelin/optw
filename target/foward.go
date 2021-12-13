@@ -26,6 +26,8 @@ func NewForward(listener transport.Listener, targetAddr string) *Forward {
 	}
 }
 
+func (f *Forward) Probe() {}
+
 func (f *Forward) ListenAndServe() error {
 	for {
 		conn, err := f.listener.Accept()
