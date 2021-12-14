@@ -1,4 +1,4 @@
-package hop
+package target
 
 import (
 	"encoding/json"
@@ -7,25 +7,18 @@ import (
 )
 
 type Config struct {
-	RouteConfig []RouteConfig `yaml:"route_config"`
-}
-
-type RouteConfig struct {
 	ListenerConfig ListenerConfig `yaml:"listener"`
-	HopConfig      []HopConfig    `yaml:"hops"`
+	TargetConfig   TargetConfig   `yaml:"target"`
 }
 
 type ListenerConfig struct {
-	Scheme          string `yaml:"scheme"`
-	ListenAddr      string `yaml:"listen_addr"`
-	ProbeListenAddr string `yaml:"probe_listen_addr"`
+	Scheme     string `yaml:"scheme"`
+	ListenAddr string `yaml:"listen_addr"`
+	Cfg        string `yaml:"raw_config"`
 }
 
-type HopConfig struct {
-	HopAddr   string `yaml:"hop_addr"`
-	Scheme    string `yaml:"scheme"`
-	ProbeAddr string `yaml:"probe_addr"`
-	RawConfig string `yaml:"raw_config"`
+type TargetConfig struct {
+	Address string `yaml:"address"`
 }
 
 func ParseConfig(path string) (*Config, error) {

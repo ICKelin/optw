@@ -25,13 +25,14 @@ func Main() {
 	routeTable := NewRouteTable()
 	for _, c := range routeCfg {
 		for _, hopCfg := range c.HopConfig {
-			go routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.ProbeAddr, hopCfg.RawConfig)
+			go routeTable.Add(hopCfg.Scheme, hopCfg.HopAddr, hopCfg.RawConfig)
 		}
 
 		// initial hop
 		lisCfg := c.ListenerConfig
-		h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
+		h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, lisCfg.ProbeListenAddr, routeTable)
 		go h.Serve()
+		go h.ServeProbe()
 	}
 
 	select {}

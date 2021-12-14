@@ -10,17 +10,19 @@ import (
 )
 
 type Hop struct {
-	scheme     string
-	addr       string
-	routeTable *RouteTable
-	mempool    sync.Pool
+	scheme          string
+	addr            string
+	probeListenAddr string
+	routeTable      *RouteTable
+	mempool         sync.Pool
 }
 
-func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
+func NewHop(scheme, addr, probeListenAddr string, routeTable *RouteTable) *Hop {
 	return &Hop{
-		scheme:     scheme,
-		addr:       addr,
-		routeTable: routeTable,
+		scheme:          scheme,
+		addr:            addr,
+		probeListenAddr: probeListenAddr,
+		routeTable:      routeTable,
 		mempool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 1024*4)
@@ -29,26 +31,27 @@ func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
 	}
 }
 
-func (h *Hop) Serve() error {
+func (h *Hop) Serve() {
 	switch h.scheme {
 	case "tcp":
-		return h.ServeTCP()
+		h.ServeTCP()
 	default:
-		return h.ServeMux()
+		h.ServeMux()
 	}
 }
 
-func (h *Hop) ServeTCP() error {
+func (h *Hop) ServeTCP() {
 	listener, err := net.Listen("tcp", h.addr)
 	if err != nil {
-		return err
+		logs.Error("listen tcp fail: %v", err)
+		return
 	}
 	defer listener.Close()
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logs.Debug("accept fail: %v", err)
+			logs.Error("accept fail: %v", err)
 			break
 		}
 
@@ -56,15 +59,13 @@ func (h *Hop) ServeTCP() error {
 		go h.forward(conn)
 	}
 
-	return nil
 }
 
-func (h *Hop) ServeMux() error {
-	go h.ServeProbe()
-
+func (h *Hop) ServeMux() {
 	listener, err := transport_api.NewListen(h.scheme, h.addr, "")
 	if err != nil {
-		return err
+		logs.Error("listen %s fail: %v", h.scheme, err)
+		return
 	}
 	defer listener.Close()
 
@@ -77,10 +78,7 @@ func (h *Hop) ServeMux() error {
 
 		go h.handleMuxConn(conn)
 	}
-	return nil
 }
-
-func (h *Hop) ServeProbe() {}
 
 func (h *Hop) handleMuxConn(conn transport.Conn) {
 	defer conn.Close()
@@ -119,16 +117,11 @@ func (h *Hop) forward(conn io.ReadWriteCloser) {
 		io.CopyBuffer(conn, stream, buf)
 	}()
 
-	go func() {
-		defer conn.Close()
-		defer stream.Close()
-		defer wg.Done()
-		obj := h.mempool.Get()
-		defer h.mempool.Put(obj)
-		buf := obj.([]byte)
-		_, err := io.CopyBuffer(stream, conn, buf)
-		logs.Debug("close copy conn->stream: %v", err)
-	}()
-
-	wg.Wait()
+	defer conn.Close()
+	defer stream.Close()
+	defer wg.Done()
+	obj := h.mempool.Get()
+	defer h.mempool.Put(obj)
+	buf := obj.([]byte)
+	io.CopyBuffer(stream, conn, buf)
 }

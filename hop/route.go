@@ -6,6 +6,7 @@ import (
 	"github.com/ICKelin/optw/transport"
 	"github.com/ICKelin/optw/transport/transport_api"
 	"math"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,22 +19,34 @@ var (
 
 type RouteEntry struct {
 	scheme, addr, cfg string
-	rtt               int64
-	loss              int64
+	srtt              int64
 	hitCount          int64
 	conn              transport.Conn
-	probeAddr         string
+}
+
+type EntryList []*RouteEntry
+
+func (l EntryList) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+
+func (l EntryList) Less(i, j int) bool {
+	return l[i].hitCount < l[j].hitCount
+}
+
+func (l EntryList) Len() int {
+	return len(l)
 }
 
 type RouteTable struct {
-	// key: scheme://addr
-	tableMu sync.RWMutex
-	table   map[string]*RouteEntry
+	tableMu  sync.RWMutex
+	tableIdx int32
+	table    EntryList
 }
 
 func NewRouteTable() *RouteTable {
 	rt := &RouteTable{
-		table: make(map[string]*RouteEntry),
+		table: make(EntryList, 0),
 	}
 
 	go rt.healthCheck()
@@ -45,100 +58,125 @@ func (r *RouteTable) healthCheck() {
 	defer tick.Stop()
 
 	for range tick.C {
-		deadConn := make(map[string]*RouteEntry)
-		aliveConn := make(map[string]*RouteEntry)
-		aliveConnForRtt := make(map[string]*RouteEntry, 0)
+		aliveConn := make(EntryList, 0)
 
-		r.tableMu.Lock()
-		for entryKey, entry := range r.table {
+		r.tableMu.RLock()
+		tb := r.table
+		r.tableMu.RUnlock()
+		for _, entry := range tb {
 			if entry.conn.IsClosed() {
-				logs.Error("next hop %s disconnect", entryKey)
-				deadConn[entryKey] = entry
+				logs.Error("next hop %s://%s disconnect", entry.scheme, entry.addr)
+				go r.reconnect(entry)
 			} else {
-				aliveConn[entryKey] = entry
-				aliveConnForRtt[entryKey] = entry
-				logs.Info("hop %s hit count %d", entryKey, atomic.LoadInt64(&entry.hitCount))
+				aliveConn = append(aliveConn, entry)
+				logs.Info("hop %s://%s hit count %d",
+					entry.scheme, entry.addr, atomic.LoadInt64(&entry.hitCount))
 			}
 		}
+		sort.Sort(aliveConn)
+
+		r.tableMu.Lock()
 		r.table = aliveConn
 		r.tableMu.Unlock()
-
-		if len(deadConn) > 0 {
-			go func(conns map[string]*RouteEntry) {
-				for entryKey, entry := range conns {
-					e, err := r.newEntry(entry.scheme, entry.addr, entry.probeAddr, entry.cfg)
-					if err != nil {
-						logs.Debug("new entry fail: %v", err)
-						continue
-					}
-
-					logs.Info("reconnect next hop %s", entryKey)
-
-					r.tableMu.Lock()
-					r.table[entryKey] = e
-					r.tableMu.Unlock()
-				}
-			}(deadConn)
-		}
 	}
 }
 
-func (r *RouteTable) probe(scheme, probeAddr string) {}
+func (r *RouteTable) newConn(scheme, addr, cfg string) (transport.Conn, error) {
+	dialer, err := transport_api.NewDialer(scheme, addr, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("new dialer fail: %v", err)
+	}
 
-func (r *RouteTable) newEntry(scheme, addr, probeAddr, cfg string) (*RouteEntry, error) {
+	conn, err := dialer.Dial()
+	if err != nil {
+		return nil, fmt.Errorf("dial fail: %v", err)
+	}
+
+	return conn, nil
+}
+
+func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
 	for {
-		dialer, err := transport_api.NewDialer(scheme, addr, cfg)
+		conn, err := r.newConn(scheme, addr, cfg)
 		if err != nil {
-			logs.Error("new dialer fail: %v", err)
-			time.Sleep(time.Second * 1)
-			continue
-		}
-
-		conn, err := dialer.Dial()
-		if err != nil {
-			logs.Error("dial fail: %v", err)
+			logs.Error("new conn fail: %v", err)
 			time.Sleep(time.Second * 1)
 			continue
 		}
 
 		entry := &RouteEntry{
-			scheme:    scheme,
-			addr:      addr,
-			cfg:       cfg,
-			conn:      conn,
-			probeAddr: probeAddr,
+			scheme: scheme,
+			addr:   addr,
+			cfg:    cfg,
+			conn:   conn,
 		}
 
-		go r.probe(scheme, probeAddr)
 		return entry, nil
 	}
 }
 
-func (r *RouteTable) Add(scheme, addr, probeAddr, cfg string) error {
-	entry, err := r.newEntry(scheme, addr, probeAddr, cfg)
+func (r *RouteTable) reconnect(e *RouteEntry) {
+	var err error
+	for {
+		e, err = r.newEntry(e.scheme, e.addr, e.cfg)
+		if err != nil {
+			logs.Error("reconnect %s://%s fail, retrying")
+			continue
+		}
+
+		logs.Info("reconnect %s://%s success", e.scheme, e.addr)
+		r.table = append(r.table, e)
+		break
+	}
+}
+
+func (r *RouteTable) Add(scheme, addr, cfg string) error {
+	entry, err := r.newEntry(scheme, addr, cfg)
 	if err != nil {
 		return err
 	}
 
-	entryKey := fmt.Sprintf("%s://%s", scheme, addr)
 	r.tableMu.Lock()
 	defer r.tableMu.Unlock()
-	r.table[entryKey] = entry
-	logs.Debug("add route table: %s %+v", entryKey, entry)
+	r.table = append(r.table, entry)
+	logs.Debug("add route table:  %+v", entry)
 	return nil
 }
 
 func (r *RouteTable) Del(scheme, addr string) {
 	r.tableMu.Lock()
 	defer r.tableMu.Unlock()
-	for key, entry := range r.table {
+	idx := -1
+	for i, entry := range r.table {
 		if entry.scheme == scheme &&
 			entry.addr == addr {
-			delete(r.table, key)
+			idx = i
 			entry.conn.Close()
 			break
 		}
 	}
+
+	if idx == -1 {
+		return
+	}
+
+	// first element
+	if idx == 0 {
+		if len(r.table) == 0 {
+			r.table = make(EntryList, 0)
+		} else {
+			r.table = r.table[idx+1:]
+		}
+		return
+	}
+
+	// last element
+	if idx == len(r.table)-1 {
+		r.table = r.table[:idx]
+		return
+	}
+
+	r.table = append(r.table[:idx], r.table[idx+1:]...)
 }
 
 func (r *RouteTable) Route() (transport.Stream, error) {
@@ -147,6 +185,7 @@ func (r *RouteTable) Route() (transport.Stream, error) {
 	if len(r.table) <= 0 {
 		return nil, errNoRoute
 	}
+
 	for _, e := range r.table {
 		stream, err := e.conn.OpenStream()
 		if err != nil {
