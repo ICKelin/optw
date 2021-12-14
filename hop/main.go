@@ -30,9 +30,8 @@ func Main() {
 
 		// initial hop
 		lisCfg := c.ListenerConfig
-		h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, lisCfg.ProbeListenAddr, routeTable)
+		h := NewHop(lisCfg.Scheme, lisCfg.ListenAddr, routeTable)
 		go h.Serve()
-		go h.ServeProbe()
 	}
 
 	select {}

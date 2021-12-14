@@ -10,19 +10,17 @@ import (
 )
 
 type Hop struct {
-	scheme          string
-	addr            string
-	probeListenAddr string
-	routeTable      *RouteTable
-	mempool         sync.Pool
+	scheme     string
+	addr       string
+	routeTable *RouteTable
+	mempool    sync.Pool
 }
 
-func NewHop(scheme, addr, probeListenAddr string, routeTable *RouteTable) *Hop {
+func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
 	return &Hop{
-		scheme:          scheme,
-		addr:            addr,
-		probeListenAddr: probeListenAddr,
-		routeTable:      routeTable,
+		scheme:     scheme,
+		addr:       addr,
+		routeTable: routeTable,
 		mempool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 1024*4)

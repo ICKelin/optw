@@ -16,9 +16,8 @@ type RouteConfig struct {
 }
 
 type ListenerConfig struct {
-	Scheme          string `yaml:"scheme"`
-	ListenAddr      string `yaml:"listen_addr"`
-	ProbeListenAddr string `yaml:"probe_listen_addr"`
+	Scheme     string `yaml:"scheme"`
+	ListenAddr string `yaml:"listen_addr"`
 }
 
 type HopConfig struct {
