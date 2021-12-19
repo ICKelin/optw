@@ -39,9 +39,8 @@ func (l EntryList) Len() int {
 }
 
 type RouteTable struct {
-	tableMu  sync.RWMutex
-	tableIdx int32
-	table    EntryList
+	tableMu sync.RWMutex
+	table   EntryList
 }
 
 func NewRouteTable() *RouteTable {
@@ -60,14 +59,16 @@ func (r *RouteTable) healthCheck() {
 	for range tick.C {
 		aliveConn := make(EntryList, 0)
 
-		r.tableMu.RLock()
-		tb := r.table
-		r.tableMu.RUnlock()
+		r.tableMu.Lock()
+		tb := make(EntryList, len(r.table))
+		copy(tb, r.table)
+		r.tableMu.Unlock()
 		for _, entry := range tb {
 			if entry.conn.IsClosed() {
-				logs.Error("next hop %s://%s disconnect", entry.scheme, entry.addr)
+				logs.Error("next hop %s://%s is closed", entry.scheme, entry.addr)
 				go r.reconnect(entry)
 			} else {
+				// TODO: measurement rtt
 				aliveConn = append(aliveConn, entry)
 				logs.Info("hop %s://%s hit count %d",
 					entry.scheme, entry.addr, atomic.LoadInt64(&entry.hitCount))

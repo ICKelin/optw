@@ -1,0 +1,7 @@
+listener:
+  scheme: "kcp"
+  listen_addr: ":3001"
+  raw_config: ""
+
+target:
+  address: "127.0.0.1:10001"
