@@ -44,4 +44,6 @@ type Stream interface {
 	SetWriteDeadline(time.Time) error
 	SetReadDeadline(time.Time) error
 	RemoteAddr() net.Addr
+	LocalAddr() net.Addr
+	SetDeadline(t time.Time) error
 }
