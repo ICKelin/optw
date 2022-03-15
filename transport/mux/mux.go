@@ -54,6 +54,10 @@ func (c *Conn) LocalAddr() net.Addr {
 	return c.mux.LocalAddr()
 }
 
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.mux.SetDeadline(t)
+}
+
 func NewDialer(remote string) transport.Dialer {
 	return &Dialer{remote}
 }

@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"net"
+	"time"
 
 	"github.com/ICKelin/optw/transport"
 	"github.com/xtaci/smux"
@@ -40,4 +41,8 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 func (c *Conn) LocalAddr() net.Addr {
 	return c.mux.LocalAddr()
+}
+
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.mux.SetDeadline(t)
 }

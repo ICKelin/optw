@@ -31,6 +31,8 @@ type Conn interface {
 	Close()
 	IsClosed() bool
 	RemoteAddr() net.Addr
+	LocalAddr() net.Addr
+	SetDeadline(t time.Time) error
 }
 
 // Stream defines a transport_api stream base on
