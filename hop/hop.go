@@ -12,14 +12,16 @@ import (
 type Hop struct {
 	scheme     string
 	addr       string
+	key        string
 	routeTable *RouteTable
 	mempool    sync.Pool
 }
 
-func NewHop(scheme, addr string, routeTable *RouteTable) *Hop {
+func NewHop(scheme, addr, key string, routeTable *RouteTable) *Hop {
 	return &Hop{
 		scheme:     scheme,
 		addr:       addr,
+		key:        key,
 		routeTable: routeTable,
 		mempool: sync.Pool{
 			New: func() interface{} {
@@ -60,7 +62,7 @@ func (h *Hop) ServeTCP() {
 }
 
 func (h *Hop) ServeMux() {
-	listener, err := transport_api.NewListen(h.scheme, h.addr, "")
+	listener, err := transport_api.NewListen(h.scheme, h.addr, h.key, "")
 	if err != nil {
 		logs.Error("listen %s fail: %v", h.scheme, err)
 		return

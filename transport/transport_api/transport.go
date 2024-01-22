@@ -16,11 +16,11 @@ var (
 	errUnsupported = errors.New("transport_api: unsupported protocol")
 )
 
-func NewListen(scheme, addr, cfg string) (transport.Listener, error) {
+func NewListen(scheme, addr, key, cfg string) (transport.Listener, error) {
 	var listener transport.Listener
 	switch scheme {
 	case protoKCP:
-		listener = kcp.NewListener(addr, []byte(cfg))
+		listener = kcp.NewListener(addr, key, []byte(cfg))
 		err := listener.Listen()
 		if err != nil {
 			return nil, err
@@ -39,11 +39,11 @@ func NewListen(scheme, addr, cfg string) (transport.Listener, error) {
 	return listener, nil
 }
 
-func NewDialer(scheme, addr, cfg string) (transport.Dialer, error) {
+func NewDialer(scheme, addr, key, cfg string) (transport.Dialer, error) {
 	var dialer transport.Dialer
 	switch scheme {
 	case protoKCP:
-		dialer = kcp.NewDialer(addr, []byte(cfg))
+		dialer = kcp.NewDialer(addr, key, []byte(cfg))
 	case protoTCPMux:
 		dialer = mux.NewDialer(addr)
 	default:

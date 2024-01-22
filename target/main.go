@@ -21,6 +21,7 @@ func Main() {
 
 	listener, err := transport_api.NewListen(cfg.ListenerConfig.Scheme,
 		cfg.ListenerConfig.ListenAddr,
+		cfg.ListenerConfig.Key,
 		cfg.ListenerConfig.Cfg)
 
 	if err != nil {

@@ -14,6 +14,7 @@ type Config struct {
 type ListenerConfig struct {
 	Scheme     string `yaml:"scheme"`
 	ListenAddr string `yaml:"listen_addr"`
+	Key        string `yaml:"key"`
 	Cfg        string `yaml:"raw_config"`
 }
 

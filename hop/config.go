@@ -18,11 +18,13 @@ type RouteConfig struct {
 type ListenerConfig struct {
 	Scheme     string `yaml:"scheme"`
 	ListenAddr string `yaml:"listen_addr"`
+	Key        string `yaml:"key"`
 }
 
 type HopConfig struct {
 	HopAddr   string `yaml:"hop_addr"`
 	Scheme    string `yaml:"scheme"`
+	Key       string `yaml:"key"`
 	ProbeAddr string `yaml:"probe_addr"`
 	RawConfig string `yaml:"raw_config"`
 }

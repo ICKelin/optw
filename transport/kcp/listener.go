@@ -1,7 +1,9 @@
 package kcp
 
 import (
+	"crypto/sha1"
 	"encoding/json"
+	"golang.org/x/crypto/pbkdf2"
 	"net"
 
 	"github.com/ICKelin/optw/transport"
@@ -14,10 +16,11 @@ var _ transport.Listener = &Listener{}
 type Listener struct {
 	laddr  string
 	config KCPConfig
+	key    string
 	*kcpgo.Listener
 }
 
-func NewListener(laddr string, rawConfig json.RawMessage) *Listener {
+func NewListener(laddr string, key string, rawConfig json.RawMessage) *Listener {
 	l := &Listener{}
 	if len(rawConfig) <= 0 {
 		l.config = defaultConfig
@@ -28,11 +31,48 @@ func NewListener(laddr string, rawConfig json.RawMessage) *Listener {
 	}
 
 	l.laddr = laddr
+	l.key = key
 	return l
 }
 
 func (l *Listener) Listen() error {
-	kcpLis, err := kcpgo.ListenWithOptions(l.laddr, nil, 10, 3)
+	cfg := l.config
+	var block kcpgo.BlockCrypt
+	pass := pbkdf2.Key([]byte(l.key), []byte(SALT), 4096, 32, sha1.New)
+
+	switch cfg.Crypt {
+	case "null":
+		block = nil
+	case "sm4":
+		block, _ = kcpgo.NewSM4BlockCrypt(pass[:16])
+	case "tea":
+		block, _ = kcpgo.NewTEABlockCrypt(pass[:16])
+	case "xor":
+		block, _ = kcpgo.NewSimpleXORBlockCrypt(pass)
+	case "none":
+		block, _ = kcpgo.NewNoneBlockCrypt(pass)
+	case "aes-128":
+		block, _ = kcpgo.NewAESBlockCrypt(pass[:16])
+	case "aes-192":
+		block, _ = kcpgo.NewAESBlockCrypt(pass[:24])
+	case "blowfish":
+		block, _ = kcpgo.NewBlowfishBlockCrypt(pass)
+	case "twofish":
+		block, _ = kcpgo.NewTwofishBlockCrypt(pass)
+	case "cast5":
+		block, _ = kcpgo.NewCast5BlockCrypt(pass[:16])
+	case "3des":
+		block, _ = kcpgo.NewTripleDESBlockCrypt(pass[:24])
+	case "xtea":
+		block, _ = kcpgo.NewXTEABlockCrypt(pass[:16])
+	case "salsa20":
+		block, _ = kcpgo.NewSalsa20BlockCrypt(pass)
+	default:
+		cfg.Crypt = "aes"
+		block, _ = kcpgo.NewAESBlockCrypt(pass)
+	}
+
+	kcpLis, err := kcpgo.ListenWithOptions(l.laddr, block, 10, 3)
 	if err != nil {
 		return err
 	}

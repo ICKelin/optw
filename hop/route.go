@@ -18,10 +18,10 @@ var (
 )
 
 type RouteEntry struct {
-	scheme, addr, cfg string
-	srtt              int64
-	hitCount          int64
-	conn              transport.Conn
+	scheme, addr, key, cfg string
+	srtt                   int64
+	hitCount               int64
+	conn                   transport.Conn
 }
 
 type EntryList []*RouteEntry
@@ -82,8 +82,8 @@ func (r *RouteTable) healthCheck() {
 	}
 }
 
-func (r *RouteTable) newConn(scheme, addr, cfg string) (transport.Conn, error) {
-	dialer, err := transport_api.NewDialer(scheme, addr, cfg)
+func (r *RouteTable) newConn(scheme, addr, key, cfg string) (transport.Conn, error) {
+	dialer, err := transport_api.NewDialer(scheme, addr, key, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("new dialer fail: %v", err)
 	}
@@ -96,9 +96,9 @@ func (r *RouteTable) newConn(scheme, addr, cfg string) (transport.Conn, error) {
 	return conn, nil
 }
 
-func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
+func (r *RouteTable) newEntry(scheme, addr, key, cfg string) (*RouteEntry, error) {
 	for {
-		conn, err := r.newConn(scheme, addr, cfg)
+		conn, err := r.newConn(scheme, addr, key, cfg)
 		if err != nil {
 			logs.Error("new conn fail: %v", err)
 			time.Sleep(time.Second * 1)
@@ -119,7 +119,7 @@ func (r *RouteTable) newEntry(scheme, addr, cfg string) (*RouteEntry, error) {
 func (r *RouteTable) reconnect(e *RouteEntry) {
 	var err error
 	for {
-		e, err = r.newEntry(e.scheme, e.addr, e.cfg)
+		e, err = r.newEntry(e.scheme, e.addr, e.key, e.cfg)
 		if err != nil {
 			logs.Error("reconnect %s://%s fail, retrying")
 			continue
@@ -131,8 +131,8 @@ func (r *RouteTable) reconnect(e *RouteEntry) {
 	}
 }
 
-func (r *RouteTable) Add(scheme, addr, cfg string) error {
-	entry, err := r.newEntry(scheme, addr, cfg)
+func (r *RouteTable) Add(scheme, addr, key, cfg string) error {
+	entry, err := r.newEntry(scheme, addr, key, cfg)
 	if err != nil {
 		return err
 	}

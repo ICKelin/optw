@@ -10,10 +10,11 @@ type KCPConfig struct {
 	Resend   int `json:"resend"`
 	Nc       int `json:"nc"`
 	// windows size
-	SndWnd     int  `json:"sndwnd"`
-	RcvWnd     int  `json:"rcvwnd"`
-	Mtu        int  `json:"mtu"`
-	AckNoDelay bool `json:"ackNoDelay"`
-	Rcvbuf     int  `json:"rcvBuf"`
-	SndBuf     int  `json:"sndBuf"`
+	SndWnd     int    `json:"sndwnd"`
+	RcvWnd     int    `json:"rcvwnd"`
+	Mtu        int    `json:"mtu"`
+	AckNoDelay bool   `json:"ackNoDelay"`
+	Rcvbuf     int    `json:"rcvBuf"`
+	SndBuf     int    `json:"sndBuf"`
+	Crypt      string `json:"crypt"`
 }
