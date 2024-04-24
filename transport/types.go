@@ -1,6 +1,9 @@
 package transport
 
 import (
+	"encoding/binary"
+	"fmt"
+	"io"
 	"net"
 	"time"
 )
@@ -8,6 +11,7 @@ import (
 // Dialer defines transport_api dialer for client side
 type Dialer interface {
 	Dial() (Conn, error)
+	SetAccessToken(accessToken string)
 }
 
 // Listener defines transport_api listener for server side
@@ -22,6 +26,8 @@ type Listener interface {
 
 	// Addr returns address of listener
 	Addr() net.Addr
+
+	SetAuthFunc(func(token string) bool)
 }
 
 // Conn defines a transport_api connection
@@ -46,4 +52,24 @@ type Stream interface {
 	RemoteAddr() net.Addr
 	LocalAddr() net.Addr
 	SetDeadline(t time.Time) error
+}
+
+func VerifyAuth(conn io.Reader, authFn func(token string) bool) error {
+	hdr := make([]byte, 2)
+	_, err := io.ReadFull(conn, hdr)
+	if err != nil {
+		return fmt.Errorf("read auth hdr fail: %v", err)
+	}
+	tokenLen := binary.BigEndian.Uint16(hdr)
+	token := make([]byte, tokenLen)
+	_, err = io.ReadFull(conn, token)
+	if err != nil {
+		return fmt.Errorf("read access token fail: %v", err)
+	}
+
+	ok := authFn(string(token))
+	if !ok {
+		return fmt.Errorf("verify token %s fail", token)
+	}
+	return nil
 }

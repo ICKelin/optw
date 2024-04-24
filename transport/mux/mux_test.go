@@ -1,59 +1,86 @@
 package mux
 
 import (
-	"fmt"
+	"github.com/smartystreets/goconvey/convey"
 	"testing"
 	"time"
-
-	"github.com/ICKelin/optw/transport"
 )
 
-func TestYamux(t *testing.T) {
-	lis, err := Listen("127.0.0.1:50051")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	go func() {
-		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				t.Error(err)
-				return
-			}
+func TestMux(t *testing.T) {
+	convey.Convey("test optw transport/mux", t, func() {
+		convey.Convey("test auth success", func() {
+			l := NewListener("127.0.0.1:2001")
+			l.SetAuthFunc(func(token string) bool {
+				if token == "test auth" {
+					return true
+				}
+				return false
+			})
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001")
+			d.SetAccessToken("test auth")
 
 			go func() {
-				defer conn.Close()
-				count := 0
-				for {
-					stream, err := conn.AcceptStream()
-					if err != nil {
-						break
-					}
-					count += 1
-					fmt.Println("Accept stream ", count)
-					go func(s transport.Stream) {
-						stream.Close()
-					}(stream)
+				_, err := l.Accept()
+				if err != nil {
+					t.Error("err should be nil")
 				}
 			}()
-		}
-	}()
-	dialer := &Dialer{}
-	conn, err := dialer.Dial("127.0.0.1:50051")
-	if err != nil {
-		t.Log(err)
-		return
-	}
-	defer conn.Close()
-	for i := 0; i < 1000; i++ {
-		stream, err := conn.OpenStream()
-		if err != nil {
-			t.Error(err)
-			break
-		}
-		stream.Close()
-		time.Sleep(time.Millisecond * 100)
-	}
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			defer conn.Close()
+		})
+
+		convey.Convey("test auth fail", func() {
+			l := NewListener("127.0.0.1:2001")
+			l.SetAuthFunc(func(token string) bool {
+				if token == "test auth" {
+					return true
+				}
+				return false
+			})
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001")
+			d.SetAccessToken("invalid test auth")
+
+			go func() {
+				_, err := l.Accept()
+				if err == nil {
+					t.Error("err should not be nil")
+				}
+			}()
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldNotBeNil)
+			defer conn.Close()
+		})
+
+		convey.Convey("no auth test", func() {
+			l := NewListener("127.0.0.1:2001")
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001")
+
+			go func() {
+				_, err := l.Accept()
+				if err != nil {
+					t.Error("err should be nil")
+				}
+			}()
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldBeNil)
+			defer conn.Close()
+		})
+	})
 }

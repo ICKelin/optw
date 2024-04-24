@@ -1,8 +1,8 @@
 package kcp
 
 import (
+	"encoding/binary"
 	"encoding/json"
-
 	"github.com/ICKelin/optw/transport"
 	kcpgo "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
@@ -26,8 +26,13 @@ var defaultConfig = KCPConfig{
 }
 
 type Dialer struct {
-	remote string
-	config KCPConfig
+	remote      string
+	config      KCPConfig
+	accessToken string
+}
+
+func (dialer *Dialer) SetAccessToken(accessToken string) {
+	dialer.accessToken = accessToken
 }
 
 func NewDialer(remote string, rawConfig json.RawMessage) *Dialer {
@@ -44,21 +49,31 @@ func NewDialer(remote string, rawConfig json.RawMessage) *Dialer {
 
 func (dialer *Dialer) Dial() (transport.Conn, error) {
 	cfg := dialer.config
-	kcpconn, err := kcpgo.DialWithOptions(dialer.remote, nil, cfg.FecDataShards, cfg.FecParityShards)
+	conn, err := kcpgo.DialWithOptions(dialer.remote, nil, cfg.FecDataShards, cfg.FecParityShards)
 	if err != nil {
 		return nil, err
 	}
 
-	kcpconn.SetStreamMode(true)
-	kcpconn.SetWriteDelay(false)
-	kcpconn.SetNoDelay(cfg.Nodelay, cfg.Interval, cfg.Resend, cfg.Nc)
-	kcpconn.SetWindowSize(cfg.RcvWnd, cfg.SndWnd)
-	kcpconn.SetMtu(cfg.Mtu)
-	kcpconn.SetACKNoDelay(cfg.AckNoDelay)
-	kcpconn.SetReadBuffer(cfg.Rcvbuf)
-	kcpconn.SetWriteBuffer(cfg.SndBuf)
+	// enable auth
+	if len(dialer.accessToken) > 0 {
+		hdr := make([]byte, 2)
+		binary.BigEndian.PutUint16(hdr, uint16(len(dialer.accessToken)))
+		_, err = conn.Write(append(hdr, []byte(dialer.accessToken)...))
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	sess, err := smux.Client(kcpconn, nil)
+	conn.SetStreamMode(true)
+	conn.SetWriteDelay(false)
+	conn.SetNoDelay(cfg.Nodelay, cfg.Interval, cfg.Resend, cfg.Nc)
+	conn.SetWindowSize(cfg.RcvWnd, cfg.SndWnd)
+	conn.SetMtu(cfg.Mtu)
+	conn.SetACKNoDelay(cfg.AckNoDelay)
+	conn.SetReadBuffer(cfg.Rcvbuf)
+	conn.SetWriteBuffer(cfg.SndBuf)
+
+	sess, err := smux.Client(conn, nil)
 	if err != nil {
 		return nil, err
 	}

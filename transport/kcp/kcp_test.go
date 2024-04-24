@@ -1,59 +1,106 @@
 package kcp
 
 import (
-	"fmt"
+	"github.com/smartystreets/goconvey/convey"
+	"strings"
+	"sync"
 	"testing"
 	"time"
-
-	"github.com/ICKelin/optw/transport"
 )
 
 func TestKCP(t *testing.T) {
-	lis, err := Listen("127.0.0.1:50051")
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	convey.Convey("test optw transport/mux", t, func() {
+		convey.Convey("test auth success", func() {
+			l := NewListener("127.0.0.1:2001", nil)
+			l.SetAuthFunc(func(token string) bool {
+				if token == "test auth" {
+					return true
+				}
+				return false
+			})
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001", nil)
+			d.SetAccessToken("test auth")
 
-	go func() {
-		for {
-			conn, err := lis.Accept()
-			if err != nil {
-				t.Error(err)
-				return
-			}
-
+			wg := sync.WaitGroup{}
+			wg.Add(1)
 			go func() {
-				defer conn.Close()
-				count := 0
-				for {
-					stream, err := conn.AcceptStream()
-					if err != nil {
-						break
-					}
-					count += 1
-					fmt.Println("Accept stream ", count)
-					go func(s transport.Stream) {
-						stream.Close()
-					}(stream)
+				defer wg.Done()
+				_, err := l.Accept()
+				if err != nil {
+					t.Error("err should be nil, got ", err)
 				}
 			}()
-		}
-	}()
-	dialer := &Dialer{}
-	conn, err := dialer.Dial("127.0.0.1:50051")
-	if err != nil {
-		t.Log(err)
-		return
-	}
-	defer conn.Close()
-	for i := 0; i < 1000; i++ {
-		stream, err := conn.OpenStream()
-		if err != nil {
-			t.Error(err)
-			break
-		}
-		stream.Close()
-		time.Sleep(time.Millisecond * 10)
-	}
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldBeNil)
+			wg.Wait()
+			defer conn.Close()
+		})
+
+		convey.Convey("test auth fail", func() {
+			l := NewListener("127.0.0.1:2001", nil)
+			l.SetAuthFunc(func(token string) bool {
+				if token == "test auth" {
+					return true
+				}
+				return false
+			})
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001", nil)
+			d.SetAccessToken("invalid test auth")
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := l.Accept()
+				if err == nil {
+					t.Error("err should not be nil")
+				}
+				exist := strings.Contains(err.Error(), "auth fail")
+				if !exist {
+					t.Error("err should contains auth keyword")
+				}
+			}()
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldBeNil)
+			wg.Wait()
+			defer conn.Close()
+		})
+
+		convey.Convey("no auth test", func() {
+			l := NewListener("127.0.0.1:2001", nil)
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001", nil)
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := l.Accept()
+				if err != nil {
+					t.Error("err should be nil")
+				}
+			}()
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldBeNil)
+			wg.Wait()
+			defer conn.Close()
+		})
+	})
 }

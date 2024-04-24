@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 
 	"github.com/ICKelin/optw/transport"
@@ -15,6 +16,11 @@ type Listener struct {
 	laddr  string
 	config KCPConfig
 	*kcpgo.Listener
+	authFn func(token string) bool
+}
+
+func (l *Listener) SetAuthFunc(f func(token string) bool) {
+	l.authFn = f
 }
 
 func NewListener(laddr string, rawConfig json.RawMessage) *Listener {
@@ -44,20 +50,28 @@ func (l *Listener) Listen() error {
 
 func (l *Listener) Accept() (transport.Conn, error) {
 	cfg := l.config
-	kcpconn, err := l.Listener.AcceptKCP()
+	conn, err := l.Listener.AcceptKCP()
 	if err != nil {
 		return nil, err
 	}
 
-	kcpconn.SetStreamMode(true)
-	kcpconn.SetWriteDelay(false)
-	kcpconn.SetNoDelay(cfg.Nodelay, cfg.Interval, cfg.Resend, cfg.Nc)
-	kcpconn.SetWindowSize(cfg.RcvWnd, cfg.SndWnd)
-	kcpconn.SetMtu(cfg.Mtu)
-	kcpconn.SetACKNoDelay(cfg.AckNoDelay)
-	kcpconn.SetReadBuffer(cfg.Rcvbuf)
-	kcpconn.SetWriteBuffer(cfg.SndBuf)
-	mux, err := smux.Server(kcpconn, nil)
+	if l.authFn != nil {
+		err := transport.VerifyAuth(conn, l.authFn)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("auth fail: %v", err)
+		}
+	}
+
+	conn.SetStreamMode(true)
+	conn.SetWriteDelay(false)
+	conn.SetNoDelay(cfg.Nodelay, cfg.Interval, cfg.Resend, cfg.Nc)
+	conn.SetWindowSize(cfg.RcvWnd, cfg.SndWnd)
+	conn.SetMtu(cfg.Mtu)
+	conn.SetACKNoDelay(cfg.AckNoDelay)
+	conn.SetReadBuffer(cfg.Rcvbuf)
+	conn.SetWriteBuffer(cfg.SndBuf)
+	mux, err := smux.Server(conn, nil)
 	if err != nil {
 		return nil, err
 	}

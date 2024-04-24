@@ -1,6 +1,8 @@
 package mux
 
 import (
+	"encoding/binary"
+	"fmt"
 	"net"
 	"time"
 
@@ -13,12 +15,18 @@ var _ transport.Dialer = &Dialer{}
 var _ transport.Conn = &Conn{}
 
 type Dialer struct {
-	remote string
+	remote      string
+	accessToken string
+}
+
+func (d *Dialer) SetAccessToken(accessToken string) {
+	d.accessToken = accessToken
 }
 
 type Listener struct {
 	laddr string
 	net.Listener
+	authFn func(token string) bool
 }
 
 type Conn struct {
@@ -59,13 +67,23 @@ func (c *Conn) SetDeadline(t time.Time) error {
 }
 
 func NewDialer(remote string) transport.Dialer {
-	return &Dialer{remote}
+	return &Dialer{remote: remote}
 }
 
 func (d *Dialer) Dial() (transport.Conn, error) {
 	conn, err := net.Dial("tcp", d.remote)
 	if err != nil {
 		return nil, err
+	}
+
+	// enable auth
+	if len(d.accessToken) > 0 {
+		hdr := make([]byte, 2)
+		binary.BigEndian.PutUint16(hdr, uint16(len(d.accessToken)))
+		_, err = conn.Write(append(hdr, []byte(d.accessToken)...))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfg := smux.DefaultConfig()
@@ -89,6 +107,14 @@ func (l *Listener) Accept() (transport.Conn, error) {
 		return nil, err
 	}
 
+	// enable auth
+	if l.authFn != nil {
+		err := transport.VerifyAuth(conn, l.authFn)
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("auth fail: %v", err)
+		}
+	}
 	cfg := smux.DefaultConfig()
 	cfg.KeepAliveTimeout = time.Second * 10
 	cfg.KeepAliveInterval = time.Second * 3
@@ -112,4 +138,8 @@ func (l *Listener) Listen() error {
 
 	l.Listener = listener
 	return nil
+}
+
+func (l *Listener) SetAuthFunc(f func(token string) bool) {
+	l.authFn = f
 }
