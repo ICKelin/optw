@@ -23,10 +23,7 @@ func TestKCP(t *testing.T) {
 			d := NewDialer("127.0.0.1:2001", nil)
 			d.SetAccessToken("test auth")
 
-			wg := sync.WaitGroup{}
-			wg.Add(1)
 			go func() {
-				defer wg.Done()
 				_, err := l.Accept()
 				if err != nil {
 					t.Error("err should be nil, got ", err)
@@ -36,9 +33,6 @@ func TestKCP(t *testing.T) {
 			time.Sleep(time.Second * 1)
 			conn, err := d.Dial()
 			convey.So(err, convey.ShouldBeNil)
-			_, err = conn.OpenStream()
-			convey.So(err, convey.ShouldBeNil)
-			wg.Wait()
 			defer conn.Close()
 		})
 
@@ -55,10 +49,7 @@ func TestKCP(t *testing.T) {
 			d := NewDialer("127.0.0.1:2001", nil)
 			d.SetAccessToken("invalid test auth")
 
-			wg := sync.WaitGroup{}
-			wg.Add(1)
 			go func() {
-				defer wg.Done()
 				_, err := l.Accept()
 				if err == nil {
 					t.Error("err should not be nil")
@@ -70,12 +61,8 @@ func TestKCP(t *testing.T) {
 			}()
 
 			time.Sleep(time.Second * 1)
-			conn, err := d.Dial()
-			convey.So(err, convey.ShouldBeNil)
-			_, err = conn.OpenStream()
-			convey.So(err, convey.ShouldBeNil)
-			wg.Wait()
-			defer conn.Close()
+			_, err := d.Dial()
+			convey.So(err, convey.ShouldNotBeNil)
 		})
 
 		convey.Convey("no auth test", func() {

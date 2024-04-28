@@ -55,11 +55,8 @@ func TestMux(t *testing.T) {
 			}()
 
 			time.Sleep(time.Second * 1)
-			conn, err := d.Dial()
-			convey.So(err, convey.ShouldBeNil)
-			_, err = conn.OpenStream()
+			_, err := d.Dial()
 			convey.So(err, convey.ShouldNotBeNil)
-			defer conn.Close()
 		})
 
 		convey.Convey("no auth test", func() {

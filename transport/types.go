@@ -54,7 +54,35 @@ type Stream interface {
 	SetDeadline(t time.Time) error
 }
 
-func VerifyAuth(conn io.Reader, authFn func(token string) bool) error {
+func AuthRequest(conn io.ReadWriter, token string) error {
+	hdr := make([]byte, 2)
+	binary.BigEndian.PutUint16(hdr, uint16(len(token)))
+	_, err := conn.Write(append(hdr, []byte(token)...))
+	if err != nil {
+		return err
+	}
+
+	// read auth reply
+	hdr = make([]byte, 2)
+	_, err = io.ReadFull(conn, hdr)
+	if err != nil {
+		return fmt.Errorf("read auth reply hdr fail: %v", err)
+	}
+
+	tokenLen := binary.BigEndian.Uint16(hdr)
+	tokenReply := make([]byte, tokenLen)
+	_, err = io.ReadFull(conn, tokenReply)
+	if err != nil {
+		return fmt.Errorf("read reply access token fail: %v", err)
+	}
+
+	if string(tokenReply) != token {
+		return fmt.Errorf("verify auth reply fail, expect %s got %s", token, tokenReply)
+	}
+	return nil
+}
+
+func VerifyAuth(conn io.ReadWriter, authFn func(token string) bool) error {
 	hdr := make([]byte, 2)
 	_, err := io.ReadFull(conn, hdr)
 	if err != nil {
@@ -70,6 +98,11 @@ func VerifyAuth(conn io.Reader, authFn func(token string) bool) error {
 	ok := authFn(string(token))
 	if !ok {
 		return fmt.Errorf("verify token %s fail", token)
+	}
+
+	_, err = conn.Write(append(hdr, token...))
+	if err != nil {
+		return fmt.Errorf("write auth reply fail: %v", err)
 	}
 	return nil
 }

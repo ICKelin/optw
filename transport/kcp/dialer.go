@@ -1,11 +1,11 @@
 package kcp
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"github.com/ICKelin/optw/transport"
 	kcpgo "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
+	"time"
 )
 
 var _ transport.Dialer = &Dialer{}
@@ -56,10 +56,11 @@ func (dialer *Dialer) Dial() (transport.Conn, error) {
 
 	// enable auth
 	if len(dialer.accessToken) > 0 {
-		hdr := make([]byte, 2)
-		binary.BigEndian.PutUint16(hdr, uint16(len(dialer.accessToken)))
-		_, err = conn.Write(append(hdr, []byte(dialer.accessToken)...))
+		conn.SetDeadline(time.Now().Add(time.Second * 5))
+		err = transport.AuthRequest(conn, dialer.accessToken)
+		conn.SetDeadline(time.Time{})
 		if err != nil {
+			conn.Close()
 			return nil, err
 		}
 	}
