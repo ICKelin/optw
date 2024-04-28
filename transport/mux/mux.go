@@ -109,7 +109,9 @@ func (l *Listener) Accept() (transport.Conn, error) {
 
 	// enable auth
 	if l.authFn != nil {
+		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 		err := transport.VerifyAuth(conn, l.authFn)
+		conn.SetReadDeadline(time.Time{})
 		if err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("auth fail: %v", err)
