@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"github.com/ICKelin/optw/transport"
 	quic_go "github.com/quic-go/quic-go"
 	"math/big"
@@ -49,7 +50,23 @@ func (l *Listener) Listen() error {
 func (l *Listener) Accept() (transport.Conn, error) {
 	conn, err := l.listener.Accept(context.Background())
 	if err != nil {
+		fmt.Println("err================", err)
 		return nil, err
+	}
+
+	if l.authFn != nil {
+		stream, err := conn.AcceptStream(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		defer stream.Close()
+
+		stream.SetDeadline(time.Now().Add(time.Second * 5))
+		err = transport.VerifyAuth(stream, l.authFn)
+		stream.SetDeadline(time.Time{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Conn{close: false, conn: conn}, nil
@@ -89,6 +106,22 @@ func (d *Dialer) Dial() (transport.Conn, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// enable auth
+	if len(d.accessToken) > 0 {
+		stream, err := conn.OpenStream()
+		if err != nil {
+			return nil, err
+		}
+		defer stream.Close()
+
+		stream.SetDeadline(time.Now().Add(time.Second * 5))
+		err = transport.AuthRequest(stream, d.accessToken)
+		stream.SetDeadline(time.Time{})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Conn{close: false, conn: conn}, nil

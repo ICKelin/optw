@@ -5,11 +5,13 @@ import (
 	"github.com/ICKelin/optw/transport"
 	"github.com/ICKelin/optw/transport/kcp"
 	"github.com/ICKelin/optw/transport/mux"
+	"github.com/ICKelin/optw/transport/quic"
 )
 
 const (
 	protoKCP    = "kcp"
 	protoTCPMux = "mux"
+	protoQuic   = "quic"
 )
 
 var (
@@ -21,20 +23,17 @@ func NewListen(scheme, addr, cfg string) (transport.Listener, error) {
 	switch scheme {
 	case protoKCP:
 		listener = kcp.NewListener(addr, []byte(cfg))
-		err := listener.Listen()
-		if err != nil {
-			return nil, err
-		}
-
 	case protoTCPMux:
 		listener = mux.NewListener(addr)
-		err := listener.Listen()
-		if err != nil {
-			return nil, err
-		}
-
+	case protoQuic:
+		listener = quic.NewListener(addr)
 	default:
 		return nil, errUnsupported
+	}
+
+	err := listener.Listen()
+	if err != nil {
+		return nil, err
 	}
 	return listener, nil
 }
@@ -46,6 +45,8 @@ func NewDialer(scheme, addr, cfg string) (transport.Dialer, error) {
 		dialer = kcp.NewDialer(addr, []byte(cfg))
 	case protoTCPMux:
 		dialer = mux.NewDialer(addr)
+	case protoQuic:
+		dialer = quic.NewDialer(addr)
 	default:
 		return nil, errUnsupported
 	}

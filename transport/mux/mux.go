@@ -116,7 +116,6 @@ func (l *Listener) Accept() (transport.Conn, error) {
 			conn.Close()
 			return nil, fmt.Errorf("auth fail: %v", err)
 		}
-
 	}
 	cfg := smux.DefaultConfig()
 	cfg.KeepAliveTimeout = time.Second * 10
