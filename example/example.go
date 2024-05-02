@@ -1,15 +1,3 @@
-## optw
-transport protocol wrapper, support:
-
-- [xtaci/smux](https://github.com/xtaci/smux)
-- [xtaci/kcp-go](https://github.com/xtaci/kcp-go)
-- [quic-go/quic-go](https://github.com/quic-go/quic-go)
-
-## example
-
-[example.go](example/example.go)
-
-```go
 package main
 
 import (
@@ -103,9 +91,3 @@ func handleStream(stream optw.Stream) {
 	defer stream.Close()
 	io.Copy(os.Stdout, stream)
 }
-
-
-```
-
-more usages see [gtun](https://github.com/ICKelin/gtun)
-

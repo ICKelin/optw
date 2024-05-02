@@ -1,20 +1,20 @@
 package kcp
 
 import (
+	"github.com/ICKelin/optw"
 	"net"
 	"time"
 
-	"github.com/ICKelin/optw/transport"
 	"github.com/xtaci/smux"
 )
 
-var _ transport.Conn = &Conn{}
+var _ optw.Conn = &Conn{}
 
 type Conn struct {
 	mux *smux.Session
 }
 
-func (c *Conn) OpenStream() (transport.Stream, error) {
+func (c *Conn) OpenStream() (optw.Stream, error) {
 	stream, err := c.mux.OpenStream()
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func (c *Conn) OpenStream() (transport.Stream, error) {
 	return stream, nil
 }
 
-func (c *Conn) AcceptStream() (transport.Stream, error) {
+func (c *Conn) AcceptStream() (optw.Stream, error) {
 	return c.mux.AcceptStream()
 }
 

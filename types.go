@@ -1,9 +1,8 @@
-package transport
+package optw
 
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/ICKelin/optw/internal/logs"
 	"io"
 	"net"
 	"time"
@@ -91,13 +90,11 @@ func VerifyAuth(conn io.ReadWriter, authFn func(token string) bool) error {
 	}
 
 	tokenLen := binary.BigEndian.Uint16(hdr)
-	logs.Debug("read token len %d", tokenLen)
 	token := make([]byte, tokenLen)
 	_, err = io.ReadFull(conn, token)
 	if err != nil {
 		return fmt.Errorf("read access token fail: %v", err)
 	}
-	logs.Debug("read token %s", token)
 	ok := authFn(string(token))
 	if !ok {
 		return fmt.Errorf("verify token %s fail", token)

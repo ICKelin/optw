@@ -3,15 +3,15 @@ package kcp
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ICKelin/optw"
 	"net"
 	"time"
 
-	"github.com/ICKelin/optw/transport"
 	kcpgo "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
 )
 
-var _ transport.Listener = &Listener{}
+var _ optw.Listener = &Listener{}
 
 type Listener struct {
 	laddr  string
@@ -49,7 +49,7 @@ func (l *Listener) Listen() error {
 	return nil
 }
 
-func (l *Listener) Accept() (transport.Conn, error) {
+func (l *Listener) Accept() (optw.Conn, error) {
 	cfg := l.config
 	conn, err := l.Listener.AcceptKCP()
 	if err != nil {
@@ -58,7 +58,7 @@ func (l *Listener) Accept() (transport.Conn, error) {
 
 	if l.authFn != nil {
 		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
-		err := transport.VerifyAuth(conn, l.authFn)
+		err := optw.VerifyAuth(conn, l.authFn)
 		conn.SetReadDeadline(time.Time{})
 		if err != nil {
 			conn.Close()

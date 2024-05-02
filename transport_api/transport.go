@@ -2,10 +2,10 @@ package transport_api
 
 import (
 	"errors"
-	"github.com/ICKelin/optw/transport"
-	"github.com/ICKelin/optw/transport/kcp"
-	"github.com/ICKelin/optw/transport/mux"
-	"github.com/ICKelin/optw/transport/quic"
+	"github.com/ICKelin/optw"
+	kcp2 "github.com/ICKelin/optw/kcp"
+	"github.com/ICKelin/optw/mux"
+	"github.com/ICKelin/optw/quic"
 )
 
 const (
@@ -18,11 +18,11 @@ var (
 	errUnsupported = errors.New("transport_api: unsupported protocol")
 )
 
-func NewListen(scheme, addr, cfg string) (transport.Listener, error) {
-	var listener transport.Listener
+func NewListen(scheme, addr, cfg string) (optw.Listener, error) {
+	var listener optw.Listener
 	switch scheme {
 	case protoKCP:
-		listener = kcp.NewListener(addr, []byte(cfg))
+		listener = kcp2.NewListener(addr, []byte(cfg))
 	case protoTCPMux:
 		listener = mux.NewListener(addr)
 	case protoQuic:
@@ -38,11 +38,11 @@ func NewListen(scheme, addr, cfg string) (transport.Listener, error) {
 	return listener, nil
 }
 
-func NewDialer(scheme, addr, cfg string) (transport.Dialer, error) {
-	var dialer transport.Dialer
+func NewDialer(scheme, addr, cfg string) (optw.Dialer, error) {
+	var dialer optw.Dialer
 	switch scheme {
 	case protoKCP:
-		dialer = kcp.NewDialer(addr, []byte(cfg))
+		dialer = kcp2.NewDialer(addr, []byte(cfg))
 	case protoTCPMux:
 		dialer = mux.NewDialer(addr)
 	case protoQuic:

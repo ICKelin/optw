@@ -2,13 +2,13 @@ package kcp
 
 import (
 	"encoding/json"
-	"github.com/ICKelin/optw/transport"
+	"github.com/ICKelin/optw"
 	kcpgo "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
 	"time"
 )
 
-var _ transport.Dialer = &Dialer{}
+var _ optw.Dialer = &Dialer{}
 
 var defaultConfig = KCPConfig{
 	FecDataShards:   10,
@@ -47,7 +47,7 @@ func NewDialer(remote string, rawConfig json.RawMessage) *Dialer {
 	return dialer
 }
 
-func (dialer *Dialer) Dial() (transport.Conn, error) {
+func (dialer *Dialer) Dial() (optw.Conn, error) {
 	cfg := dialer.config
 	conn, err := kcpgo.DialWithOptions(dialer.remote, nil, cfg.FecDataShards, cfg.FecParityShards)
 	if err != nil {
@@ -57,7 +57,7 @@ func (dialer *Dialer) Dial() (transport.Conn, error) {
 	// enable auth
 	if len(dialer.accessToken) > 0 {
 		conn.SetDeadline(time.Now().Add(time.Second * 5))
-		err = transport.AuthRequest(conn, dialer.accessToken)
+		err = optw.AuthRequest(conn, dialer.accessToken)
 		conn.SetDeadline(time.Time{})
 		if err != nil {
 			conn.Close()

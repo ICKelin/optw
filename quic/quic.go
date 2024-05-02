@@ -7,16 +7,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
-	"github.com/ICKelin/optw/transport"
+	"github.com/ICKelin/optw"
 	quic_go "github.com/quic-go/quic-go"
 	"math/big"
 	"net"
 	"time"
 )
 
-var _ transport.Listener = &Listener{}
-var _ transport.Dialer = &Dialer{}
+var _ optw.Listener = &Listener{}
+var _ optw.Dialer = &Dialer{}
 
 var nextProtocols = []string{
 	"ickelin/optw",
@@ -47,10 +46,9 @@ func (l *Listener) Listen() error {
 	return nil
 }
 
-func (l *Listener) Accept() (transport.Conn, error) {
+func (l *Listener) Accept() (optw.Conn, error) {
 	conn, err := l.listener.Accept(context.Background())
 	if err != nil {
-		fmt.Println("err================", err)
 		return nil, err
 	}
 
@@ -62,7 +60,7 @@ func (l *Listener) Accept() (transport.Conn, error) {
 		defer stream.Close()
 
 		stream.SetDeadline(time.Now().Add(time.Second * 5))
-		err = transport.VerifyAuth(stream, l.authFn)
+		err = optw.VerifyAuth(stream, l.authFn)
 		stream.SetDeadline(time.Time{})
 		if err != nil {
 			return nil, err
@@ -96,7 +94,7 @@ func NewDialer(addr string) *Dialer {
 	return &Dialer{addr: addr}
 }
 
-func (d *Dialer) Dial() (transport.Conn, error) {
+func (d *Dialer) Dial() (optw.Conn, error) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         nextProtocols,
@@ -117,7 +115,7 @@ func (d *Dialer) Dial() (transport.Conn, error) {
 		defer stream.Close()
 
 		stream.SetDeadline(time.Now().Add(time.Second * 5))
-		err = transport.AuthRequest(stream, d.accessToken)
+		err = optw.AuthRequest(stream, d.accessToken)
 		stream.SetDeadline(time.Time{})
 		if err != nil {
 			return nil, err

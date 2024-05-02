@@ -2,16 +2,16 @@ package mux
 
 import (
 	"fmt"
+	"github.com/ICKelin/optw"
 	"net"
 	"time"
 
-	"github.com/ICKelin/optw/transport"
 	"github.com/xtaci/smux"
 )
 
-var _ transport.Listener = &Listener{}
-var _ transport.Dialer = &Dialer{}
-var _ transport.Conn = &Conn{}
+var _ optw.Listener = &Listener{}
+var _ optw.Dialer = &Dialer{}
+var _ optw.Conn = &Conn{}
 
 type Dialer struct {
 	remote      string
@@ -32,7 +32,7 @@ type Conn struct {
 	mux *smux.Session
 }
 
-func (c *Conn) OpenStream() (transport.Stream, error) {
+func (c *Conn) OpenStream() (optw.Stream, error) {
 	stream, err := c.mux.OpenStream()
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *Conn) OpenStream() (transport.Stream, error) {
 	return stream, nil
 }
 
-func (c *Conn) AcceptStream() (transport.Stream, error) {
+func (c *Conn) AcceptStream() (optw.Stream, error) {
 	return c.mux.AcceptStream()
 }
 
@@ -65,11 +65,11 @@ func (c *Conn) SetDeadline(t time.Time) error {
 	return c.mux.SetDeadline(t)
 }
 
-func NewDialer(remote string) transport.Dialer {
+func NewDialer(remote string) optw.Dialer {
 	return &Dialer{remote: remote}
 }
 
-func (d *Dialer) Dial() (transport.Conn, error) {
+func (d *Dialer) Dial() (optw.Conn, error) {
 	conn, err := net.Dial("tcp", d.remote)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (d *Dialer) Dial() (transport.Conn, error) {
 	// enable auth
 	if len(d.accessToken) > 0 {
 		conn.SetDeadline(time.Now().Add(time.Second * 5))
-		err = transport.AuthRequest(conn, d.accessToken)
+		err = optw.AuthRequest(conn, d.accessToken)
 		conn.SetDeadline(time.Time{})
 		if err != nil {
 			conn.Close()
@@ -101,7 +101,7 @@ func NewListener(laddr string) *Listener {
 	return &Listener{laddr: laddr}
 }
 
-func (l *Listener) Accept() (transport.Conn, error) {
+func (l *Listener) Accept() (optw.Conn, error) {
 	conn, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (l *Listener) Accept() (transport.Conn, error) {
 	// enable auth
 	if l.authFn != nil {
 		conn.SetDeadline(time.Now().Add(time.Second * 5))
-		err := transport.VerifyAuth(conn, l.authFn)
+		err := optw.VerifyAuth(conn, l.authFn)
 		conn.SetDeadline(time.Time{})
 		if err != nil {
 			conn.Close()

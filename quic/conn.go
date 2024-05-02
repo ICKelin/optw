@@ -2,7 +2,7 @@ package quic
 
 import (
 	"context"
-	"github.com/ICKelin/optw/transport"
+	"github.com/ICKelin/optw"
 	quic_go "github.com/quic-go/quic-go"
 	"net"
 	"time"
@@ -13,7 +13,7 @@ type Conn struct {
 	conn  quic_go.Connection
 }
 
-func (c *Conn) OpenStream() (transport.Stream, error) {
+func (c *Conn) OpenStream() (optw.Stream, error) {
 	stream, err := c.conn.OpenStream()
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func (c *Conn) OpenStream() (transport.Stream, error) {
 	return &Stream{rawConn: c, Stream: stream}, nil
 }
 
-func (c *Conn) AcceptStream() (transport.Stream, error) {
+func (c *Conn) AcceptStream() (optw.Stream, error) {
 	stream, err := c.conn.AcceptStream(context.Background())
 	if err != nil {
 		return nil, err
