@@ -2,6 +2,7 @@ package kcp
 
 import (
 	"github.com/smartystreets/goconvey/convey"
+	"github.com/xtaci/smux"
 	"strings"
 	"sync"
 	"testing"
@@ -87,6 +88,38 @@ func TestKCP(t *testing.T) {
 			_, err = conn.OpenStream()
 			convey.So(err, convey.ShouldBeNil)
 			wg.Wait()
+			defer conn.Close()
+		})
+
+		convey.Convey("test reconnect", func() {
+			l := NewListener("127.0.0.1:2001", nil)
+			l.Listen()
+			defer l.Close()
+			d := NewDialer("127.0.0.1:2001", nil)
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				conn, err := l.Accept()
+				if err != nil {
+					t.Error("err should be nil")
+				}
+				conn.Close()
+				l.Close()
+			}()
+
+			time.Sleep(time.Second * 1)
+			conn, err := d.Dial()
+			convey.So(err, convey.ShouldBeNil)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldBeNil)
+			wg.Wait()
+
+			time.Sleep(smux.DefaultConfig().KeepAliveTimeout + time.Second)
+			_, err = conn.OpenStream()
+			convey.So(err, convey.ShouldNotBeNil)
+			convey.So(conn.IsClosed(), convey.ShouldBeTrue)
 			defer conn.Close()
 		})
 	})
